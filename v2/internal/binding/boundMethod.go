@@ -37,7 +37,17 @@ func (b *BoundMethod) ParseArgs(args []json.RawMessage) ([]interface{}, error) {
 		inputValue := reflect.New(typ).Interface()
 		err := json.Unmarshal(arg, inputValue)
 		if err != nil {
-			return nil, err
+			// Allow serialising stringified int64/uint64 back into int64/uint64
+			// This is because Javascript cannot handle number in the range [-2^53, 2^53-1]
+			// So any number larger than this will be serialised as string
+			if (typ.Kind() == reflect.Int64 || typ.Kind() == reflect.Uint64) && arg[0] == byte(34) && arg[len(arg)-1] == byte(34) {
+				err = json.Unmarshal(arg[1:len(arg)-1], inputValue)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, err
+			}
 		}
 		if inputValue == nil {
 			result[index] = reflect.Zero(typ).Interface()
